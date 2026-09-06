@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.2
 // ws-cli — a multi-repo workspace helper, invoked as `ws`.
 
 import PackageDescription

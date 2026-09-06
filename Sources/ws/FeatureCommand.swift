@@ -18,6 +18,10 @@ struct Feature: ParsableCommand {
           help: "Stash uncommitted changes in each module instead of refusing to start.")
     var force = false
 
+    @Flag(name: [.customShort("g"), .customLong("generate")],
+          help: "Run `jarvis generate` in each module after branching.")
+    var generate = false
+
     func run() throws {
         let names = modules
             .split(separator: ",")
@@ -34,14 +38,16 @@ struct Feature: ParsableCommand {
             runner: ProcessRunner(),
             branch: branch,
             moduleNames: names,
-            force: force
+            force: force,
+            generate: generate
         )
 
         let outcomes = try starter.run()
 
         for outcome in outcomes {
             let stash = outcome.stashed ? "stashed · " : ""
-            print("\(outcome.module)  \(stash)fetched · branched from \(outcome.base)")
+            let gen = outcome.generated ? " · generated" : ""
+            print("\(outcome.module)  \(stash)fetched · branched from \(outcome.base)\(gen)")
         }
         print("\(outcomes.count) module\(outcomes.count == 1 ? "" : "s") on \(branch)")
     }

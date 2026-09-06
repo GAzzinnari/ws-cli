@@ -6,6 +6,7 @@ public enum WorkspaceError: Error, CustomStringConvertible {
     case wsHomeNotADirectory(String)
     case manifestNotFound(String)
     case gitFailed(repo: String, command: String, stderr: String)
+    case commandFailed(repo: String, command: String, stderr: String)
     case unrecognizedRemote(String)
     case openFailed(url: String, stderr: String)
     case featureBlocked(reasons: [String])
@@ -22,6 +23,9 @@ public enum WorkspaceError: Error, CustomStringConvertible {
         case .gitFailed(let repo, let command, let stderr):
             let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             return "git \(command) failed in \(repo): \(detail)"
+        case .commandFailed(let repo, let command, let stderr):
+            let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "`\(command)` failed in \(repo): \(detail)"
         case .unrecognizedRemote(let url):
             return "don't know how to turn this remote into a web URL: \(url)"
         case .openFailed(let url, let stderr):

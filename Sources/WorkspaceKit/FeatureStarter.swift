@@ -13,6 +13,7 @@ public struct FeatureStarter: Sendable {
         public let stashed: Bool
         /// The ref the new branch was cut from, e.g. `origin/main` or `main (local)`.
         public let base: String
+        public let generated: Bool
     }
 
     let workspace: Workspace
@@ -20,19 +21,22 @@ public struct FeatureStarter: Sendable {
     let branch: String
     let moduleNames: [String]
     let force: Bool
+    let generate: Bool
 
     public init(
         workspace: Workspace,
         runner: any ProcessRunning,
         branch: String,
         moduleNames: [String],
-        force: Bool
+        force: Bool,
+        generate: Bool
     ) {
         self.workspace = workspace
         self.runner = runner
         self.branch = branch
         self.moduleNames = moduleNames
         self.force = force
+        self.generate = generate
     }
 
     public func run() throws -> [Outcome] {
@@ -46,6 +50,7 @@ public struct FeatureStarter: Sendable {
     private struct Plan {
         let repo: Repo
         let git: Git
+        let url: URL
         let defaultBranch: String
         let dirty: Bool
         let hasRemoteDefault: Bool
@@ -57,6 +62,10 @@ public struct FeatureStarter: Sendable {
 
         if !isValidBranchName(branch) {
             reasons.append("'\(branch)' is not a valid branch name")
+        }
+
+        if generate, !isOnPath("jarvis") {
+            reasons.append("--generate needs 'jarvis' on PATH")
         }
 
         for name in moduleNames {
@@ -104,6 +113,7 @@ public struct FeatureStarter: Sendable {
             plans.append(Plan(
                 repo: repo,
                 git: git,
+                url: url,
                 defaultBranch: defaultBranch,
                 dirty: dirty,
                 hasRemoteDefault: hasRemoteDefault
@@ -140,7 +150,24 @@ public struct FeatureStarter: Sendable {
             }
 
             try git.createBranch(branch)
-            outcomes.append(Outcome(module: plan.repo.name, stashed: stashed, base: base))
+
+            if generate {
+                let result = try runner.run("jarvis", ["generate"], in: plan.url)
+                guard result.succeeded else {
+                    throw WorkspaceError.commandFailed(
+                        repo: plan.repo.name,
+                        command: "jarvis generate",
+                        stderr: result.stderr
+                    )
+                }
+            }
+
+            outcomes.append(Outcome(
+                module: plan.repo.name,
+                stashed: stashed,
+                base: base,
+                generated: generate
+            ))
         }
         return outcomes
     }
@@ -148,6 +175,11 @@ public struct FeatureStarter: Sendable {
     private func isValidBranchName(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
         let result = try? runner.run("git", ["check-ref-format", "refs/heads/\(name)"], in: workspace.root)
+        return result?.succeeded ?? false
+    }
+
+    private func isOnPath(_ tool: String) -> Bool {
+        let result = try? runner.run("which", [tool], in: workspace.root)
         return result?.succeeded ?? false
     }
 }

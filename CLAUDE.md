@@ -107,4 +107,5 @@ swift build && swift run ws status     # dev
 make install                           # release → ~/.local/bin/ws
 ```
 
-Swift 6.3, `swiftLanguageModes: [.v6]`. Single dependency: swift-argument-parser.
+`swift-tools-version: 6.2`, `swiftLanguageModes: [.v6]`. Single dependency:
+swift-argument-parser.
