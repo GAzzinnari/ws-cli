@@ -13,6 +13,10 @@ spawning, SPM executables, git integration, distribution. Explanations of what i
 different from app development are welcome; hand-holding on Swift the language is
 not.
 
+## Commands today
+
+`init`, `status`, `pulls`, `feature`, `local`. `README.md` documents what each does.
+
 ## Working preferences (important)
 
 - **No tests.** The owner explicitly does not want a test target, `Tests/`
@@ -24,10 +28,10 @@ not.
 
 Two targets, and the split is deliberate — keep it:
 
-- `Sources/ws/` — the executable (`@main` in `WS.swift`). One file per
-  subcommand (`InitCommand.swift`, `StatusCommand.swift`, `PullsCommand.swift`).
-  This target is **thin**: parse args, call into `WorkspaceKit`, format output.
-  It is the only target that imports ArgumentParser.
+- `Sources/ws/` — the executable (`@main` in `WS.swift`). One file per subcommand
+  (`InitCommand`, `StatusCommand`, `PullsCommand`, `FeatureCommand`,
+  `LocalCommand`). This target is **thin**: parse args, call into `WorkspaceKit`,
+  format output. It is the only target that imports ArgumentParser.
 - `Sources/WorkspaceKit/` — all logic. No ArgumentParser import. Public API.
 
 Key types in `WorkspaceKit`:
@@ -35,11 +39,13 @@ Key types in `WorkspaceKit`:
 | Type | Role |
 |---|---|
 | `Workspace` | Resolves `WS_HOME` → root URL; gives `.ws.json` path and per-repo URLs |
-| `Manifest` / `Repo` | Codable models for `.ws.json`. `Repo.defaultBranch` is optional |
+| `Manifest` / `Repo` | Codable models for `.ws.json`. `Repo.defaultBranch` and `Repo.packageName` are optional |
 | `ManifestStore` | load / save `.ws.json` (pretty-printed, sorted keys, trailing newline) |
 | `RepoScanner` | Direct children of the root containing a `.git` entry, sorted |
 | `ProcessRunning` (protocol) / `ProcessRunner` | Run an external command → `CommandResult` |
-| `Git` | Read-only git queries for one repo, built on a `ProcessRunning` |
+| `Git` | Per-repo git via `ProcessRunning`: reads (branch, dirty, upstream delta, default branch), actions (fetch, stash, checkout, create branch, ff-merge), predicates (local/remote branch exists, is-ancestor) |
+| `FeatureStarter` | Orchestrates `ws feature`: preflight every module, then execute (stash → checkout default → ff-merge → branch) |
+| `PackageEditor` | Pure line-based `Package.swift` rewrite for `ws local`: `.dependency(…)` → `.dependency(path:)`, `.product` `package:` → full repo name |
 | `RemoteWebURL` | Pure: git remote URL → `https://host/owner/repo` |
 | `Opener` | Hand a URL to macOS `open` |
 | `WorkspaceError` | Single error enum, `CustomStringConvertible`, human-readable messages |
@@ -63,9 +69,15 @@ Key types in `WorkspaceKit`:
 - Diagnostics go to **stderr** (`FileHandle.standardError`), real output to
   stdout, so results stay pipeable. `pulls --print` is the reference: URL to
   stdout, "opening …" to stderr.
-- `WS_HOME`-based commands (`init`, `status`) go through
-  `Workspace.fromEnvironment()`. Repo-local commands (`pulls`) inspect the
-  current directory and ignore the manifest — state which kind a new command is.
+- `WS_HOME`-based commands (`init`, `status`, `feature`, `local`) go through
+  `Workspace.fromEnvironment()`. Repo-local commands (`pulls`) inspect the current
+  directory and ignore the manifest. `local` is both — manifest for the module
+  paths, plus repo-local git on the Package.swift's own repo when `-b` is passed.
+  State which kind a new command is.
+- **Mutating multi-repo commands preflight hard.** `feature` and `local` validate
+  every target and collect *all* the failures first, then throw
+  `WorkspaceError.featureBlocked` / `.localBlocked` with the full list and change
+  nothing. New mutating commands follow the same shape.
 
 ## Known limitations / deferred
 
@@ -74,14 +86,19 @@ Key types in `WorkspaceKit`:
   (concurrent reads) is deferred.
 - `status` is sequential. Parallelizing across repos with `TaskGroup` is a
   planned step, not yet done.
+- `feature` / `local` preflight hard, but do not roll back a failure that happens
+  *during* execution — they stop and report which modules were already changed.
+- `local`'s file edit is line-based and matches package names as a bare substring
+  (a name inside a comment or a longer identifier on a `.dependency`/`.product`
+  line would match). One call per line is assumed.
 - macOS only (`open`, `expandingTildeInPath` behavior). No Linux support
   intended right now.
 
 ## Roadmap (owner's learning path, roughly in order)
 
 `ws exec` → concurrent `ws status` → `ws sync` (fetch + ff-only pull) →
-`ws prune` (delete branches merged into `defaultBranch`) → `ws local` /
-`ws unlocal` (swap SPM remote deps for local path overrides).
+`ws prune` (delete branches merged into `defaultBranch`) → `ws unlocal`
+(revert what `ws local` did).
 
 ## Build / run
 

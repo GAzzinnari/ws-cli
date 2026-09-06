@@ -9,13 +9,27 @@ Built with Swift Package Manager and
 
 ## Install
 
+From anywhere — clones, builds a release, installs to `~/.local/bin/ws`, discards
+the checkout:
+
 ```sh
-make install          # builds release, copies to ~/.local/bin/ws
+curl -fsSL https://raw.githubusercontent.com/GAzzinnari/ws-cli/master/install.sh | sh
 ```
 
-Other locations:
+Overridable with environment variables:
 
 ```sh
+curl -fsSL .../install.sh | WS_CLI_REF=v1.2.0 sh          # a tag or branch
+curl -fsSL .../install.sh | PREFIX=/usr/local sudo -E sh  # system-wide
+```
+
+`WS_CLI_REPO`, `WS_CLI_REF`, `PREFIX`, `BINDIR` are all honored. Needs `git`,
+`make`, and `swift` on `PATH`.
+
+### From a local clone
+
+```sh
+make install                            # release → ~/.local/bin/ws
 sudo make install PREFIX=/usr/local     # system-wide
 make install BINDIR=$HOME/bin           # anywhere already on your PATH
 make uninstall
@@ -35,26 +49,32 @@ ws init
 
 `ws init` scans the direct children of `WS_HOME`, records every directory that
 contains a `.git` entry, and writes `$WS_HOME/.ws.json`. For each repo it also
-stores the default branch (`main` or `master`, whichever exists locally).
+stores:
+
+- `defaultBranch` — `main` or `master`, whichever exists locally (omitted if
+  neither does)
+- `packageName` — for a repo named `ios-<x>`, the value `<x>` (omitted otherwise);
+  used by `ws local`
 
 ```json
 {
   "repos" : [
-    { "defaultBranch" : "main",   "name" : "CoreNetworking", "path" : "CoreNetworking" },
-    { "defaultBranch" : "master", "name" : "LegacyKit",      "path" : "LegacyKit" },
-    { "name" : "Oddball", "path" : "Oddball" }
+    { "defaultBranch" : "main", "name" : "MainApp", "path" : "MainApp" },
+    { "defaultBranch" : "main", "name" : "ios-networking", "packageName" : "networking", "path" : "ios-networking" },
+    { "name" : "scratch", "path" : "scratch" }
   ]
 }
 ```
 
-`path` is relative to `WS_HOME`. A repo with neither `main` nor `master` locally
-gets no `defaultBranch` key. Re-run `ws init` whenever you add or remove a repo.
+`path` is relative to `WS_HOME`. Re-run `ws init` whenever you add or remove a
+repo.
 
 ## Commands
 
 ### `ws init`
 
-Scan `WS_HOME` and (re)write `.ws.json`. Prints each repo and its default branch.
+Scan `WS_HOME` and (re)write `.ws.json`. Prints each repo with its default branch
+and package name.
 
 ### `ws status`
 
@@ -89,13 +109,63 @@ Handles `https://`, `ssh://`, and scp-like (`git@github.com:owner/repo.git`)
 remotes, including enterprise hosts. `/pulls` is GitHub's path; GitLab and
 Bitbucket use different ones and are not handled.
 
+### `ws feature -b <branch> --modules a,b,c [-f]`
+
+Start one branch across several modules at once. For every listed module it
+fetches, fast-forwards that module's default branch to the remote, and cuts
+`<branch>` from there.
+
+Every module is checked before any is touched: valid branch name, module is in
+the manifest and on disk, a default branch is recorded, `<branch>` doesn't
+already exist, the local default branch is fast-forwardable, and — unless `-f` —
+the working tree is clean. Any failure lists every reason and changes nothing.
+
+`-f` / `--force` runs `git stash push --include-untracked` in each dirty module
+instead of refusing. Stashed changes stay stashed; they do not follow onto the
+new branch.
+
+```
+$ ws feature -b feature/login --modules CoreNetworking,FeatureLogin
+CoreNetworking  fetched · branched from origin/main
+FeatureLogin  fetched · branched from origin/main
+2 modules on feature/login
+```
+
+### `ws local <package-swift-path> -p a,b,c [-b <branch>]`
+
+Rewrite a `Package.swift` so chosen packages resolve to local checkouts under
+`WS_HOME` instead of remote versions. Package names are given in stripped form —
+`networking` for the repo `ios-networking`. A directory is accepted in place of
+the file path.
+
+Line by line, for each named package:
+
+- a line with `.dependency(` that mentions the package →
+  `.dependency(path: "<absolute path to $WS_HOME/ios-networking>")`
+- a line with `.product(` that mentions the package → its `package:` argument
+  becomes `"ios-networking"` (the full repo name)
+
+Indentation and trailing commas are kept. If a named package isn't in the
+manifest, or isn't referenced anywhere in the file, the command lists the reason
+and writes nothing.
+
+`-b` / `--branch` first stashes any changes, fetches, and checks out `<branch>`
+in the Package.swift's repo, then applies the edit.
+
+```
+$ ws local App/Package.swift -p networking,login
+networking  1 dependency · 1 product
+login  1 dependency · 1 product
+updated /Users/me/Developer/MyApp/App/Package.swift
+```
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | success |
-| `1` | a runtime error (`WS_HOME` unset, no `.ws.json`, git failure, unrecognized remote) |
-| `64` | usage error — bad flag or argument (from ArgumentParser) |
+| `1` | a runtime error (`WS_HOME` unset, missing `.ws.json`, git failure, blocked `feature` / `local` preflight, unrecognized remote) |
+| `64` | usage error — bad flag, missing argument, no `Package.swift` at the given path (from ArgumentParser) |
 
 ## Development
 
@@ -108,5 +178,5 @@ Layout:
 
 - `Sources/ws/` — the executable. `@main` in `WS.swift`, one file per subcommand.
   Thin: it only wires ArgumentParser to `WorkspaceKit`.
-- `Sources/WorkspaceKit/` — all the logic (manifest, scanning, git queries,
-  process running). No ArgumentParser dependency.
+- `Sources/WorkspaceKit/` — all the logic (manifest, scanning, git queries and
+  actions, `Package.swift` editing). No ArgumentParser dependency.
