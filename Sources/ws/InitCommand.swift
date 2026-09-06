@@ -18,6 +18,7 @@ struct Init: ParsableCommand {
             let git = Git(runner: ProcessRunner(), repoURL: workspace.url(for: repo), repoName: repo.name)
             var enriched = repo
             enriched.defaultBranch = (try? git.defaultBranch()) ?? nil
+            enriched.packageName = packageName(forRepoNamed: repo.name)
             return enriched
         }
 
@@ -26,7 +27,16 @@ struct Init: ParsableCommand {
         let noun = repos.count == 1 ? "repository" : "repositories"
         print("found \(repos.count) \(noun) → \(workspace.manifestURL.path)")
         for repo in repos {
-            print("  \(repo.name)  (\(repo.defaultBranch ?? "no default branch"))")
+            let pkg = repo.packageName.map { ", package \($0)" } ?? ""
+            print("  \(repo.name)  (\(repo.defaultBranch ?? "no default branch")\(pkg))")
         }
+    }
+
+    /// `ios-<x>` → `<x>`, anything else → nil.
+    private func packageName(forRepoNamed name: String) -> String? {
+        let prefix = "ios-"
+        guard name.hasPrefix(prefix) else { return nil }
+        let stripped = String(name.dropFirst(prefix.count))
+        return stripped.isEmpty ? nil : stripped
     }
 }

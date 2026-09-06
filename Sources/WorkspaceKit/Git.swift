@@ -1,6 +1,6 @@
 import Foundation
 
-/// Thin, read-only git queries for one repository.
+/// Thin git queries and actions for one repository.
 public struct Git: Sendable {
     let runner: any ProcessRunning
     let repoURL: URL
@@ -58,6 +58,53 @@ public struct Git: Sendable {
         return nil
     }
 
+    // MARK: - Actions (mutating)
+
+    /// Fetch from the default remote.
+    public func fetch() throws {
+        try git("fetch")
+    }
+
+    /// `git stash push --include-untracked` with a message.
+    public func stashIncludingUntracked(message: String) throws {
+        try git("stash", "push", "--include-untracked", "-m", message)
+    }
+
+    /// Check out an existing ref.
+    public func checkout(_ ref: String) throws {
+        try git("checkout", ref)
+    }
+
+    /// Create and check out a new branch from the current HEAD.
+    public func createBranch(_ name: String) throws {
+        try git("checkout", "-b", name)
+    }
+
+    /// Fast-forward the current branch to `ref`, or fail if it can't be a fast-forward.
+    public func fastForwardMerge(_ ref: String) throws {
+        try git("merge", "--ff-only", ref)
+    }
+
+    // MARK: - Predicates (no throw on a "no" answer)
+
+    /// Whether a local branch by this name exists.
+    public func localBranchExists(_ name: String) throws -> Bool {
+        try probe("rev-parse", "--verify", "--quiet", "refs/heads/\(name)")
+    }
+
+    /// Whether `<remote>/<name>` exists (call after `fetch()`).
+    public func remoteBranchExists(_ name: String, remote: String = "origin") throws -> Bool {
+        try probe("rev-parse", "--verify", "--quiet", "refs/remotes/\(remote)/\(name)")
+    }
+
+    /// Whether `ancestor` is an ancestor of `descendant` — i.e. `descendant` is a
+    /// fast-forward away from `ancestor`.
+    public func isAncestor(_ ancestor: String, of descendant: String) throws -> Bool {
+        try probe("merge-base", "--is-ancestor", ancestor, descendant)
+    }
+
+    // MARK: -
+
     @discardableResult
     private func git(_ arguments: String...) throws -> CommandResult {
         let result = try runner.run("git", Array(arguments), in: repoURL)
@@ -69,5 +116,10 @@ public struct Git: Sendable {
             )
         }
         return result
+    }
+
+    /// Run a git command purely for its exit status.
+    private func probe(_ arguments: String...) throws -> Bool {
+        try runner.run("git", Array(arguments), in: repoURL).succeeded
     }
 }

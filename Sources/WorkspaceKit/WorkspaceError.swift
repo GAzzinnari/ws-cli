@@ -8,6 +8,8 @@ public enum WorkspaceError: Error, CustomStringConvertible {
     case gitFailed(repo: String, command: String, stderr: String)
     case unrecognizedRemote(String)
     case openFailed(url: String, stderr: String)
+    case featureBlocked(reasons: [String])
+    case localBlocked(reasons: [String])
 
     public var description: String {
         switch self {
@@ -25,6 +27,10 @@ public enum WorkspaceError: Error, CustomStringConvertible {
         case .openFailed(let url, let stderr):
             let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             return "could not open \(url): \(detail)"
+        case .featureBlocked(let reasons):
+            return (["cannot start feature:"] + reasons.map { "  - \($0)" }).joined(separator: "\n")
+        case .localBlocked(let reasons):
+            return (["cannot apply local overrides:"] + reasons.map { "  - \($0)" }).joined(separator: "\n")
         }
     }
 }
