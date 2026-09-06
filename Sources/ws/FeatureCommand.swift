@@ -5,31 +5,31 @@ import WorkspaceKit
 struct Feature: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "feature",
-        abstract: "Start a branch across modules: fetch, fast-forward the default branch, branch from it."
+        abstract: "Start a branch across repos: fetch, fast-forward the default branch, branch from it."
     )
 
     @Option(name: [.customShort("b"), .customLong("branch")], help: "Name of the new branch.")
     var branch: String
 
-    @Option(name: .long, help: "Comma-separated module names from the manifest.")
-    var modules: String
+    @Option(name: .long, help: "Comma-separated repo names from the manifest.")
+    var repos: String
 
     @Flag(name: [.customShort("f"), .customLong("force")],
-          help: "Stash uncommitted changes in each module instead of refusing to start.")
+          help: "Stash uncommitted changes in each repo instead of refusing to start.")
     var force = false
 
     @Flag(name: [.customShort("g"), .customLong("generate")],
-          help: "Run `jarvis generate` in each module after branching.")
+          help: "Run `jarvis generate` in each repo after branching.")
     var generate = false
 
     func run() throws {
-        let names = modules
+        let names = repos
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
         guard !names.isEmpty else {
-            throw ValidationError("--modules needs at least one module name")
+            throw ValidationError("--repos needs at least one repo name")
         }
 
         let workspace = try Workspace.fromEnvironment()
@@ -37,7 +37,7 @@ struct Feature: ParsableCommand {
             workspace: workspace,
             runner: ProcessRunner(),
             branch: branch,
-            moduleNames: names,
+            repoNames: names,
             force: force,
             generate: generate
         )
@@ -49,6 +49,6 @@ struct Feature: ParsableCommand {
             let gen = outcome.generated ? " · generated" : ""
             print("\(outcome.module)  \(stash)fetched · branched from \(outcome.base)\(gen)")
         }
-        print("\(outcomes.count) module\(outcomes.count == 1 ? "" : "s") on \(branch)")
+        print("\(outcomes.count) repo\(outcomes.count == 1 ? "" : "s") on \(branch)")
     }
 }

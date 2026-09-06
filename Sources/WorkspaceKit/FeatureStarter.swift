@@ -19,7 +19,7 @@ public struct FeatureStarter: Sendable {
     let workspace: Workspace
     let runner: any ProcessRunning
     let branch: String
-    let moduleNames: [String]
+    let repoNames: [String]
     let force: Bool
     let generate: Bool
 
@@ -27,14 +27,14 @@ public struct FeatureStarter: Sendable {
         workspace: Workspace,
         runner: any ProcessRunning,
         branch: String,
-        moduleNames: [String],
+        repoNames: [String],
         force: Bool,
         generate: Bool
     ) {
         self.workspace = workspace
         self.runner = runner
         self.branch = branch
-        self.moduleNames = moduleNames
+        self.repoNames = repoNames
         self.force = force
         self.generate = generate
     }
@@ -68,7 +68,7 @@ public struct FeatureStarter: Sendable {
             reasons.append("--generate needs 'jarvis' on PATH")
         }
 
-        for name in moduleNames {
+        for name in repoNames {
             guard let repo = manifest.repo(named: name) else {
                 reasons.append("\(name): not in the manifest")
                 continue

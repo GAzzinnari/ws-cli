@@ -109,26 +109,29 @@ Handles `https://`, `ssh://`, and scp-like (`git@github.com:owner/repo.git`)
 remotes, including enterprise hosts. `/pulls` is GitHub's path; GitLab and
 Bitbucket use different ones and are not handled.
 
-### `ws feature -b <branch> --modules a,b,c [-f]`
+### `ws feature -b <branch> --repos a,b,c [-f] [-g]`
 
-Start one branch across several modules at once. For every listed module it
-fetches, fast-forwards that module's default branch to the remote, and cuts
-`<branch>` from there.
+Start one branch across several repos at once. For every listed repo it fetches,
+fast-forwards that repo's default branch to the remote, and cuts `<branch>` from
+there.
 
-Every module is checked before any is touched: valid branch name, module is in
-the manifest and on disk, a default branch is recorded, `<branch>` doesn't
-already exist, the local default branch is fast-forwardable, and — unless `-f` —
-the working tree is clean. Any failure lists every reason and changes nothing.
+Every repo is checked before any is touched: valid branch name, repo is in the
+manifest and on disk, a default branch is recorded, `<branch>` doesn't already
+exist, the local default branch is fast-forwardable, and — unless `-f` — the
+working tree is clean. Any failure lists every reason and changes nothing.
 
-`-f` / `--force` runs `git stash push --include-untracked` in each dirty module
+`-f` / `--force` runs `git stash push --include-untracked` in each dirty repo
 instead of refusing. Stashed changes stay stashed; they do not follow onto the
 new branch.
 
+`-g` / `--generate` runs `jarvis generate` in each repo after branching (needs
+`jarvis` on `PATH`, checked during preflight).
+
 ```
-$ ws feature -b feature/login --modules CoreNetworking,FeatureLogin
+$ ws feature -b feature/login --repos CoreNetworking,FeatureLogin
 CoreNetworking  fetched · branched from origin/main
 FeatureLogin  fetched · branched from origin/main
-2 modules on feature/login
+2 repos on feature/login
 ```
 
 ### `ws local <package-swift-path> -p a,b,c [-b <branch>]`
