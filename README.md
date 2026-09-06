@@ -191,6 +191,33 @@ removing  Core/Examples/Demo/.build  (88 MB)
 removed 3 .build directories · freed 1.6 GB
 ```
 
+### `ws prune [-n | --dry-run] [-f | --force]`
+
+In every repo, delete local branches — keeping only the branch currently checked
+out and the repo's default branch.
+
+- Default is a **soft** delete (`git branch -d`): a branch git considers not
+  fully merged is left in place and reported as `kept unmerged`. That's not an
+  error — the command carries on and still exits `0`.
+- `-f` / `--force` uses `git branch -D`, removing branches regardless of merge
+  state.
+- `-n` / `--dry-run` lists the candidates per repo and deletes nothing.
+- A repo with no recorded default branch, or a missing directory, is skipped and
+  noted. A real git error (not an unmerged refusal) is reported and makes the
+  command exit `1`.
+
+```
+$ ws prune -n
+ios-networking  would delete feature/old-thing, spike/idea
+MainApp         nothing to prune
+2 branches would be deleted — dry run
+
+$ ws prune
+ios-networking  deleted feature/old-thing · kept unmerged spike/idea
+MainApp         nothing to prune
+deleted 1 branch
+```
+
 ## Exit codes
 
 | Code | Meaning |

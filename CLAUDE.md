@@ -15,8 +15,8 @@ not.
 
 ## Commands today
 
-`init`, `status`, `pulls`, `feature`, `local`, `clean`. `README.md` documents what
-each does.
+`init`, `status`, `pulls`, `feature`, `local`, `clean`, `prune`. `README.md`
+documents what each does.
 
 ## Working preferences (important)
 
@@ -44,6 +44,7 @@ Key types in `WorkspaceKit`:
 | `ManifestStore` | load / save the manifest at a given URL (pretty-printed, sorted keys, trailing newline) |
 | `RepoScanner` | Direct children of the root containing a `.git` entry, sorted |
 | `BuildCleaner` | Recursive walk of a root for `.build` dirs (no exclusions, no symlink follow); size + delete for `ws clean` |
+| `BranchPruner` | Per repo for `ws prune`: delete local branches except current + default; soft (`-d`) keeps unmerged as `keptUnmerged`, force (`-D`) with `-f` |
 | `ProcessRunning` (protocol) / `ProcessRunner` | Run an external command → `CommandResult` |
 | `Git` | Per-repo git via `ProcessRunning`: reads (branch, dirty, upstream delta, default branch), actions (fetch, stash, checkout, create branch, ff-merge), predicates (local/remote branch exists, is-ancestor) |
 | `FeatureStarter` | Orchestrates `ws feature`: preflight every module, then execute (stash → checkout default → ff-merge → branch) |
@@ -104,8 +105,11 @@ Key types in `WorkspaceKit`:
 ## Roadmap (owner's learning path, roughly in order)
 
 `ws exec` → concurrent `ws status` → `ws sync` (fetch + ff-only pull) →
-`ws prune` (delete branches merged into `defaultBranch`) → `ws unlocal`
-(revert what `ws local` did).
+`ws unlocal` (revert what `ws local` did).
+
+`ws prune` shipped: it deletes every local branch except the current one and the
+default branch (not a merged-into check); `-d` keeps unmerged branches, `-f`
+forces `-D`.
 
 ## Build / run
 

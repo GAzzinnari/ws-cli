@@ -11,6 +11,7 @@ public enum WorkspaceError: Error, CustomStringConvertible {
     case featureBlocked(reasons: [String])
     case localBlocked(reasons: [String])
     case cleanFailed(paths: [String])
+    case pruneFailed(entries: [String])
 
     public var description: String {
         switch self {
@@ -35,6 +36,8 @@ public enum WorkspaceError: Error, CustomStringConvertible {
             return (["cannot apply local overrides:"] + reasons.map { "  - \($0)" }).joined(separator: "\n")
         case .cleanFailed(let paths):
             return (["could not delete:"] + paths.map { "  - \($0)" }).joined(separator: "\n")
+        case .pruneFailed(let entries):
+            return (["could not delete some branches:"] + entries.map { "  - \($0)" }).joined(separator: "\n")
         }
     }
 }

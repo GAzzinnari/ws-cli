@@ -85,6 +85,23 @@ public struct Git: Sendable {
         try git("merge", "--ff-only", ref)
     }
 
+    /// Delete a local branch. `force` maps to `-D`, otherwise `-d` (which git
+    /// refuses for a branch that isn't fully merged).
+    ///
+    /// - Returns: `true` when the branch was deleted; `false` when a non-force
+    ///   delete was refused because the branch is not fully merged.
+    /// - Throws: `WorkspaceError.gitFailed` for any other failure.
+    public func deleteBranch(_ name: String, force: Bool) throws -> Bool {
+        let result = try runner.run("git", ["branch", force ? "-D" : "-d", name], in: repoURL)
+        if result.succeeded { return true }
+        if result.stderr.contains("not fully merged") { return false }
+        throw WorkspaceError.gitFailed(
+            repo: repoName,
+            command: "branch \(force ? "-D" : "-d") \(name)",
+            stderr: result.stderr
+        )
+    }
+
     // MARK: - Predicates (no throw on a "no" answer)
 
     /// Whether a local branch by this name exists.
@@ -101,6 +118,16 @@ public struct Git: Sendable {
     /// fast-forward away from `ancestor`.
     public func isAncestor(_ ancestor: String, of descendant: String) throws -> Bool {
         try probe("merge-base", "--is-ancestor", ancestor, descendant)
+    }
+
+    // MARK: - Lists
+
+    /// Local branch names.
+    public func localBranches() throws -> [String] {
+        try git("for-each-ref", "--format=%(refname:short)", "refs/heads")
+            .trimmedStdout
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
     }
 
     // MARK: -
