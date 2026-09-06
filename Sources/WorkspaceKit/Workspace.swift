@@ -1,39 +1,40 @@
 import Foundation
 
-/// The workspace root, resolved from the `WS_HOME` environment variable.
-/// Everything the CLI does hangs off this one location.
+/// The workspace: a root directory holding the repos, plus the manifest that
+/// records it. The manifest lives at `$WS_CONFIG`, or `~/.ws.json` by default —
+/// never inside the workspace itself.
 public struct Workspace: Sendable {
-    public static let manifestFileName = ".ws.json"
-
     public let root: URL
 
     public init(root: URL) {
         self.root = root
     }
 
-    /// Resolve the workspace from the environment. Defaults to the real process
-    /// environment; a caller can pass its own dictionary instead.
-    public static func fromEnvironment(
+    /// The manifest file: `$WS_CONFIG` (expanded) if set, otherwise `~/.ws.json`.
+    public static func configURL(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
-    ) throws -> Workspace {
-        guard let raw = environment["WS_HOME"], !raw.isEmpty else {
-            throw WorkspaceError.wsHomeNotSet
+    ) -> URL {
+        if let custom = environment["WS_CONFIG"], !custom.isEmpty {
+            return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath).standardizedFileURL
         }
-        let expanded = (raw as NSString).expandingTildeInPath
-        let url = URL(fileURLWithPath: expanded).standardizedFileURL
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-              isDirectory.boolValue
-        else {
-            throw WorkspaceError.wsHomeNotADirectory(url.path)
-        }
-        return Workspace(root: url)
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ws.json")
     }
 
-    /// Location of `.ws.json`.
-    public var manifestURL: URL {
-        root.appendingPathComponent(Self.manifestFileName)
+    /// Load the manifest and resolve its recorded root. Throws if there is no
+    /// manifest yet or the recorded workspace directory is gone.
+    public static func load(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> (workspace: Workspace, manifest: Manifest) {
+        let manifest = try ManifestStore(url: configURL(environment)).load()
+        let root = URL(fileURLWithPath: manifest.root).standardizedFileURL
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else {
+            throw WorkspaceError.workspaceRootMissing(root.path)
+        }
+        return (Workspace(root: root), manifest)
     }
 
     /// Absolute location of a repo listed in the manifest.

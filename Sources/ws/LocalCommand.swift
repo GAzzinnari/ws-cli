@@ -5,7 +5,7 @@ import WorkspaceKit
 struct Local: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "local",
-        abstract: "Point a Package.swift's dependencies at local checkouts under WS_HOME."
+        abstract: "Point a Package.swift's dependencies at local checkouts in the workspace."
     )
 
     @Argument(help: "Path to a Package.swift (a directory is accepted).")
@@ -30,8 +30,7 @@ struct Local: ParsableCommand {
         }
 
         let packageURL = try resolvePackageManifest()
-        let workspace = try Workspace.fromEnvironment()
-        let manifest = try ManifestStore(url: workspace.manifestURL).load()
+        let (workspace, manifest) = try Workspace.load()
 
         var reasons: [String] = []
         var targets: [PackageEditor.Target] = []

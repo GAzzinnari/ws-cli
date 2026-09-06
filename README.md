@@ -39,17 +39,19 @@ make uninstall
 
 ## Setup
 
-`ws` finds your repos through the `WS_HOME` environment variable — the directory
-that contains all your module checkouts.
+`cd` to the directory that holds your repo checkouts and run `ws init`:
 
 ```sh
-export WS_HOME=~/Developer/MyApp        # add to ~/.zshrc
+cd ~/Developer/MyApp
 ws init
 ```
 
-`ws init` scans the direct children of `WS_HOME`, records every directory that
-contains a `.git` entry, and writes `$WS_HOME/.ws.json`. For each repo it also
-stores:
+No environment variable to set. `ws init` takes the current directory as the
+workspace, scans its direct children for git repos, and writes the manifest to
+`~/.ws.json` (or `$WS_CONFIG`, if set, treated as an exact file path). The
+manifest records the workspace path, so every other command works from anywhere.
+
+For each repo it stores:
 
 - `defaultBranch` — `main` or `master`, whichever exists locally (omitted if
   neither does)
@@ -58,23 +60,25 @@ stores:
 
 ```json
 {
-  "repos" : [
-    { "defaultBranch" : "main", "name" : "MainApp", "path" : "MainApp" },
-    { "defaultBranch" : "main", "name" : "ios-networking", "packageName" : "networking", "path" : "ios-networking" },
-    { "name" : "scratch", "path" : "scratch" }
+  "root": "/Users/me/Developer/MyApp",
+  "repos": [
+    { "defaultBranch": "main", "name": "MainApp", "path": "MainApp" },
+    { "defaultBranch": "main", "name": "ios-networking", "packageName": "networking", "path": "ios-networking" },
+    { "name": "scratch", "path": "scratch" }
   ]
 }
 ```
 
-`path` is relative to `WS_HOME`. Re-run `ws init` whenever you add or remove a
-repo.
+`path` is relative to `root`. Re-run `ws init` (from the workspace directory)
+whenever you add or remove a repo.
 
 ## Commands
 
 ### `ws init`
 
-Scan `WS_HOME` and (re)write `.ws.json`. Prints each repo with its default branch
-and package name.
+Take the current directory as the workspace, scan it, and (re)write the manifest
+(`~/.ws.json` or `$WS_CONFIG`). Prints each repo with its default branch and
+package name.
 
 ### `ws status`
 
@@ -94,7 +98,7 @@ MainApp         feature/login  dirty
 ### `ws pulls`
 
 Open the pull-requests page for the repo **in the current directory** (this
-command ignores `WS_HOME` / `.ws.json`). Reads `git remote get-url origin`,
+command ignores the manifest entirely). Reads `git remote get-url origin`,
 converts it to an `https://host/owner/repo` URL, and opens `…/pulls`.
 
 ```
@@ -136,15 +140,15 @@ FeatureLogin  fetched · branched from origin/main
 
 ### `ws local <package-swift-path> -p a,b,c [-b <branch>]`
 
-Rewrite a `Package.swift` so chosen packages resolve to local checkouts under
-`WS_HOME` instead of remote versions. Package names are given in stripped form —
+Rewrite a `Package.swift` so chosen packages resolve to local checkouts in the
+workspace instead of remote versions. Package names are given in stripped form —
 `networking` for the repo `ios-networking`. A directory is accepted in place of
 the file path.
 
 Line by line, for each named package:
 
 - a line with `.dependency(` that mentions the package →
-  `.dependency(path: "<absolute path to $WS_HOME/ios-networking>")`
+  `.dependency(path: "<absolute path to the repo in the workspace>")`
 - a line with `.product(` that mentions the package → its `package:` argument
   becomes `"ios-networking"` (the full repo name)
 
@@ -162,12 +166,37 @@ login  1 dependency · 1 product
 updated /Users/me/Developer/MyApp/App/Package.swift
 ```
 
+### `ws clean [-n | --dry-run]`
+
+Walk the whole workspace tree and delete every directory named `.build`, nested
+ones included. It only reads `root` from the manifest, then walks the tree
+directly — nothing is excluded from the walk (`.git` and everything else is
+descended into, just never matched).
+
+`-n` / `--dry-run` lists what would be removed and its size, and deletes nothing.
+A deletion that fails (permissions) doesn't stop the rest — the failed paths are
+listed and the command exits `1`.
+
+```
+$ ws clean -n
+would remove  App/.build       (412 MB)
+would remove  Core/.build      (1.1 GB)
+would remove  Core/Examples/Demo/.build  (88 MB)
+3 .build directories · 1.6 GB — dry run, nothing deleted
+
+$ ws clean
+removing  App/.build       (412 MB)
+removing  Core/.build      (1.1 GB)
+removing  Core/Examples/Demo/.build  (88 MB)
+removed 3 .build directories · freed 1.6 GB
+```
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | success |
-| `1` | a runtime error (`WS_HOME` unset, missing `.ws.json`, git failure, blocked `feature` / `local` preflight, unrecognized remote) |
+| `1` | a runtime error (no manifest — run `ws init`, recorded workspace gone, git failure, blocked `feature` / `local` preflight, unrecognized remote) |
 | `64` | usage error — bad flag, missing argument, no `Package.swift` at the given path (from ArgumentParser) |
 
 ## Development

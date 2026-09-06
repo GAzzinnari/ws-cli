@@ -32,9 +32,10 @@ struct Feature: ParsableCommand {
             throw ValidationError("--repos needs at least one repo name")
         }
 
-        let workspace = try Workspace.fromEnvironment()
+        let (workspace, manifest) = try Workspace.load()
         let starter = FeatureStarter(
             workspace: workspace,
+            manifest: manifest,
             runner: ProcessRunner(),
             branch: branch,
             repoNames: names,

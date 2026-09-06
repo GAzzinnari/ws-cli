@@ -5,27 +5,29 @@ import WorkspaceKit
 struct Init: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Scan WS_HOME for git repositories and write \(Workspace.manifestFileName)."
+        abstract: "Scan the current directory for git repositories and record the workspace."
     )
 
     func run() throws {
-        let workspace = try Workspace.fromEnvironment()
-        let scanned = try RepoScanner(root: workspace.root).scan()
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).standardizedFileURL
+        let scanned = try RepoScanner(root: root).scan()
 
         // Fill in each repo's default branch. A git failure for one repo leaves
         // it nil rather than aborting the whole init.
         let repos = scanned.map { repo -> Repo in
-            let git = Git(runner: ProcessRunner(), repoURL: workspace.url(for: repo), repoName: repo.name)
+            let git = Git(runner: ProcessRunner(), repoURL: root.appendingPathComponent(repo.path), repoName: repo.name)
             var enriched = repo
             enriched.defaultBranch = (try? git.defaultBranch()) ?? nil
             enriched.packageName = packageName(forRepoNamed: repo.name)
             return enriched
         }
 
-        try ManifestStore(url: workspace.manifestURL).save(Manifest(repos: repos))
+        let configURL = Workspace.configURL()
+        try ManifestStore(url: configURL).save(Manifest(root: root.path, repos: repos))
 
         let noun = repos.count == 1 ? "repository" : "repositories"
-        print("found \(repos.count) \(noun) → \(workspace.manifestURL.path)")
+        print("workspace \(root.path)")
+        print("found \(repos.count) \(noun) → \(configURL.path)")
         for repo in repos {
             let pkg = repo.packageName.map { ", package \($0)" } ?? ""
             print("  \(repo.name)  (\(repo.defaultBranch ?? "no default branch")\(pkg))")

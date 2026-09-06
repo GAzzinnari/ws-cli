@@ -9,8 +9,7 @@ struct Status: ParsableCommand {
     )
 
     func run() throws {
-        let workspace = try Workspace.fromEnvironment()
-        let manifest = try ManifestStore(url: workspace.manifestURL).load()
+        let (workspace, manifest) = try Workspace.load()
 
         let rows = manifest.repos.map { row(for: $0, in: workspace) }
         printTable(rows)

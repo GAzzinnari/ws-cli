@@ -1,10 +1,13 @@
 import Foundation
 
-/// The on-disk `.ws.json` file: the list of repos that make up the workspace.
+/// The on-disk `.ws.json` file: the workspace root and the repos under it.
 public struct Manifest: Codable, Equatable, Sendable {
+    /// Absolute path of the workspace directory the repos live in, recorded by `ws init`.
+    public var root: String
     public var repos: [Repo]
 
-    public init(repos: [Repo]) {
+    public init(root: String, repos: [Repo]) {
+        self.root = root
         self.repos = repos
     }
 
@@ -19,7 +22,7 @@ public struct Manifest: Codable, Equatable, Sendable {
     }
 }
 
-/// One repository in the workspace. `path` is relative to WS_HOME.
+/// One repository in the workspace. `path` is relative to `Manifest.root`.
 public struct Repo: Codable, Equatable, Sendable {
     public var name: String
     public var path: String

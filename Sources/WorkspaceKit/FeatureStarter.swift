@@ -17,6 +17,7 @@ public struct FeatureStarter: Sendable {
     }
 
     let workspace: Workspace
+    let manifest: Manifest
     let runner: any ProcessRunning
     let branch: String
     let repoNames: [String]
@@ -25,6 +26,7 @@ public struct FeatureStarter: Sendable {
 
     public init(
         workspace: Workspace,
+        manifest: Manifest,
         runner: any ProcessRunning,
         branch: String,
         repoNames: [String],
@@ -32,6 +34,7 @@ public struct FeatureStarter: Sendable {
         generate: Bool
     ) {
         self.workspace = workspace
+        self.manifest = manifest
         self.runner = runner
         self.branch = branch
         self.repoNames = repoNames
@@ -40,7 +43,6 @@ public struct FeatureStarter: Sendable {
     }
 
     public func run() throws -> [Outcome] {
-        let manifest = try ManifestStore(url: workspace.manifestURL).load()
         let plans = try preflight(manifest: manifest)
         return try execute(plans)
     }

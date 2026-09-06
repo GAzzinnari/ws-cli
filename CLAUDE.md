@@ -15,7 +15,8 @@ not.
 
 ## Commands today
 
-`init`, `status`, `pulls`, `feature`, `local`. `README.md` documents what each does.
+`init`, `status`, `pulls`, `feature`, `local`, `clean`. `README.md` documents what
+each does.
 
 ## Working preferences (important)
 
@@ -38,10 +39,11 @@ Key types in `WorkspaceKit`:
 
 | Type | Role |
 |---|---|
-| `Workspace` | Resolves `WS_HOME` → root URL; gives `.ws.json` path and per-repo URLs |
-| `Manifest` / `Repo` | Codable models for `.ws.json`. `Repo.defaultBranch` and `Repo.packageName` are optional |
-| `ManifestStore` | load / save `.ws.json` (pretty-printed, sorted keys, trailing newline) |
+| `Workspace` | `configURL(env:)` → `$WS_CONFIG` or `~/.ws.json`; `load(env:)` reads the manifest, resolves its `root`, checks it exists → `(Workspace, Manifest)`; `url(for:)` per-repo URL |
+| `Manifest` / `Repo` | Codable models for `.ws.json`. `Manifest.root` is the absolute workspace path. `Repo.defaultBranch` / `Repo.packageName` are optional |
+| `ManifestStore` | load / save the manifest at a given URL (pretty-printed, sorted keys, trailing newline) |
 | `RepoScanner` | Direct children of the root containing a `.git` entry, sorted |
+| `BuildCleaner` | Recursive walk of a root for `.build` dirs (no exclusions, no symlink follow); size + delete for `ws clean` |
 | `ProcessRunning` (protocol) / `ProcessRunner` | Run an external command → `CommandResult` |
 | `Git` | Per-repo git via `ProcessRunning`: reads (branch, dirty, upstream delta, default branch), actions (fetch, stash, checkout, create branch, ff-merge), predicates (local/remote branch exists, is-ancestor) |
 | `FeatureStarter` | Orchestrates `ws feature`: preflight every module, then execute (stash → checkout default → ff-merge → branch) |
@@ -69,11 +71,16 @@ Key types in `WorkspaceKit`:
 - Diagnostics go to **stderr** (`FileHandle.standardError`), real output to
   stdout, so results stay pipeable. `pulls --print` is the reference: URL to
   stdout, "opening …" to stderr.
-- `WS_HOME`-based commands (`init`, `status`, `feature`, `local`) go through
-  `Workspace.fromEnvironment()`. Repo-local commands (`pulls`) inspect the current
-  directory and ignore the manifest. `local` is both — manifest for the module
-  paths, plus repo-local git on the Package.swift's own repo when `-b` is passed.
-  State which kind a new command is.
+- Manifest-based commands (`status`, `feature`, `local`, `clean`) call
+  `Workspace.load()` — it reads `$WS_CONFIG` or `~/.ws.json` and resolves the
+  recorded `root`. `ws init` is the only command that takes the *current
+  directory* as the workspace and writes the manifest. Repo-local commands
+  (`pulls`) inspect the current directory and ignore the manifest. `local` is
+  both — manifest for the module paths, plus repo-local git on the Package.swift's
+  own repo when `-b` is passed. `clean` reads only `root` from the manifest, then
+  walks the tree with no exclusions. State which kind a new command is.
+- There is no `WS_HOME`. The workspace root lives *in* the manifest (`root`),
+  recorded from `ws init`'s cwd. The manifest file is never inside the workspace.
 - **Mutating multi-repo commands preflight hard.** `feature` and `local` validate
   every target and collect *all* the failures first, then throw
   `WorkspaceError.featureBlocked` / `.localBlocked` with the full list and change
