@@ -149,8 +149,14 @@ Line by line, for each named package:
 
 - a line with `.dependency(` that mentions the package →
   `.dependency(path: "<absolute path to the repo in the workspace>")`
+- a line with `.package(id:` that mentions the package (a SwiftPM registry
+  dependency, e.g. `.package(id: "acme.networking", exact: "1.5.0")`) →
+  `.package(path: "<absolute path to the repo in the workspace>")`
 - a line with `.product(` that mentions the package → its `package:` argument
   becomes `"ios-networking"` (the full repo name)
+
+A `.product(` line is not required: a package that is only referenced by a
+`.dependency(` or `.package(id:` line is still redirected.
 
 Indentation and trailing commas are kept. If a named package isn't in the
 manifest, or isn't referenced anywhere in the file, the command lists the reason
@@ -161,8 +167,8 @@ in the Package.swift's repo, then applies the edit.
 
 ```
 $ ws local App/Package.swift -p networking,login
-networking  1 dependency · 1 product
-login  1 dependency · 1 product
+networking  1 dependency · 0 registry · 1 product
+login  1 dependency · 0 registry · 1 product
 updated /Users/me/Developer/MyApp/App/Package.swift
 ```
 

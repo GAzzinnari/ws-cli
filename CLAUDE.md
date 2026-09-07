@@ -49,7 +49,7 @@ Key types in `WorkspaceKit`:
 | `TestOutputParser` / `TestReport` | Pure: scrape `jarvis test` console text → errors, deduped warnings, test totals, failing tests. Used by `ws test` |
 | `Git` | Per-repo git via `ProcessRunning`: reads (branch, dirty, upstream delta, default branch), actions (fetch, stash, checkout, create branch, ff-merge), predicates (local/remote branch exists, is-ancestor) |
 | `FeatureStarter` | Orchestrates `ws feature`: preflight every module, then execute (stash → checkout default → ff-merge → branch) |
-| `PackageEditor` | Pure line-based `Package.swift` rewrite for `ws local`: `.dependency(…)` → `.dependency(path:)`, `.product` `package:` → full repo name |
+| `PackageEditor` | Pure line-based `Package.swift` rewrite for `ws local`: `.dependency(…)` → `.dependency(path:)`, `.package(id: …)` (SwiftPM registry dep) → `.package(path:)`, `.product` `package:` → full repo name. A `.product` line is not required — a `.dependency`/`.package(id:)` match alone counts |
 | `RemoteWebURL` | Pure: git remote URL → `https://host/owner/repo` |
 | `Opener` | Hand a URL to macOS `open` |
 | `WorkspaceError` | Single error enum, `CustomStringConvertible`, human-readable messages |
@@ -106,8 +106,9 @@ Key types in `WorkspaceKit`:
 - `feature` / `local` preflight hard, but do not roll back a failure that happens
   *during* execution — they stop and report which modules were already changed.
 - `local`'s file edit is line-based and matches package names as a bare substring
-  (a name inside a comment or a longer identifier on a `.dependency`/`.product`
-  line would match). One call per line is assumed.
+  (a name inside a comment or a longer identifier on a
+  `.dependency`/`.package(id:)`/`.product` line would match). One call per line is
+  assumed.
 - macOS only (`open`, `expandingTildeInPath` behavior). No Linux support
   intended right now.
 

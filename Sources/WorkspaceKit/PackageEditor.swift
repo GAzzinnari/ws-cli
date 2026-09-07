@@ -2,9 +2,9 @@ import Foundation
 
 /// Rewrites a `Package.swift` so a set of packages resolve to local checkouts.
 ///
-/// Line-based: each `.dependency(...)` / `.product(...)` is assumed to be on its
-/// own line. A line "references" a package when it contains the package name as a
-/// substring. At most one rewrite is applied per line.
+/// Line-based: each `.dependency(...)` / `.package(id: ...)` / `.product(...)` is
+/// assumed to be on its own line. A line "references" a package when it contains
+/// the package name as a substring. At most one rewrite is applied per line.
 public enum PackageEditor {
 
     /// One package to redirect.
@@ -24,9 +24,10 @@ public enum PackageEditor {
     public struct Report: Sendable {
         public let packageName: String
         public var dependencyLines: Int = 0
+        public var packageIdLines: Int = 0
         public var productLines: Int = 0
 
-        public var matched: Bool { dependencyLines + productLines > 0 }
+        public var matched: Bool { dependencyLines + packageIdLines + productLines > 0 }
     }
 
     /// The rewritten contents, plus a report per target (in the given order).
@@ -50,6 +51,11 @@ public enum PackageEditor {
                     reports[target.packageName]?.dependencyLines += 1
                     break
                 }
+                if line.range(of: #"\.package\(\s*id:"#, options: .regularExpression) != nil {
+                    lines[index] = rewritePackageIDLine(line, localPath: target.localPath)
+                    reports[target.packageName]?.packageIdLines += 1
+                    break
+                }
                 if line.contains(".product("), let rewritten = rewriteProductPackage(line, to: target.fullName) {
                     lines[index] = rewritten
                     reports[target.packageName]?.productLines += 1
@@ -68,6 +74,13 @@ public enum PackageEditor {
         let indent = line.prefix { $0 == " " || $0 == "\t" }
         let comma = line.trimmingCharacters(in: .whitespaces).hasSuffix(",") ? "," : ""
         return "\(indent).dependency(path: \"\(localPath)\")\(comma)"
+    }
+
+    /// `<indent>.package(id: "…", <constraint>)<,>`  ->  `<indent>.package(path: "<localPath>")<,>`
+    private static func rewritePackageIDLine(_ line: String, localPath: String) -> String {
+        let indent = line.prefix { $0 == " " || $0 == "\t" }
+        let comma = line.trimmingCharacters(in: .whitespaces).hasSuffix(",") ? "," : ""
+        return "\(indent).package(path: \"\(localPath)\")\(comma)"
     }
 
     /// Replace the `package: "…"` argument on a `.product(…)` line. Returns nil when

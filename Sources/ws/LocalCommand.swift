@@ -63,7 +63,7 @@ struct Local: ParsableCommand {
         let (updated, reports) = PackageEditor.applyLocalOverrides(to: original, targets: targets)
 
         let unmatched = reports.filter { !$0.matched }.map {
-            "'\($0.packageName)': no .dependency or .product line references it in \(packageURL.lastPathComponent)"
+            "'\($0.packageName)': no .dependency, .package(id:), or .product line references it in \(packageURL.lastPathComponent)"
         }
         guard unmatched.isEmpty else {
             throw WorkspaceError.localBlocked(reasons: unmatched)
@@ -72,7 +72,7 @@ struct Local: ParsableCommand {
         try updated.write(to: packageURL, atomically: true, encoding: .utf8)
 
         for report in reports {
-            print("\(report.packageName)  \(report.dependencyLines) dependency · \(report.productLines) product")
+            print("\(report.packageName)  \(report.dependencyLines) dependency · \(report.packageIdLines) registry · \(report.productLines) product")
         }
         print("updated \(packageURL.path)")
     }
