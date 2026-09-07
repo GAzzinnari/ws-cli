@@ -218,13 +218,55 @@ MainApp         nothing to prune
 deleted 1 branch
 ```
 
+### `ws test [-v | --verbose] [-- <jarvis args>]`
+
+Run `jarvis test` (xcodebuild under the hood) for the repo **in the current
+directory** — like `ws pulls`, this one ignores the manifest — capture its
+output, and print a summary:
+
+- `build` — error and warning counts (compiler warnings deduped)
+- `tests` — total run, failed, skipped, wall-clock; or `did not run` if the
+  build failed first
+- `failing` — each failing test as `Suite.testName`, with `file:line` and the
+  assertion message when they're in the output
+- `warnings` — the unique warning messages (capped)
+
+Anything after `--` is forwarded to `jarvis test` (scheme, `-only-testing:`,
+etc.). `-v` echoes the raw output before the summary. The full log is always
+written to a temp file, path printed on stderr. `ws test` exits with `jarvis`'s
+own exit code.
+
+```
+$ ws test
+running jarvis test…
+full log: /var/folders/…/ws-test-1788737854.log
+
+jarvis test · ios-login
+
+build   0 errors · 3 warnings
+tests   142 run · 2 failed · 1 skipped · 47.2s
+
+failing
+  ✘ LoginViewModelTests.test_invalid_email
+      LoginViewModelTests.swift:88
+      XCTAssertEqual failed: ("nil") is not equal to ("Invalid email")
+  ✘ NetTests.test_timeout
+      NetTests.swift:20
+      Asynchronous wait failed: Exceeded timeout of 5 seconds
+
+warnings  (3 total, 2 unique)
+  · 'foo(_:)' is deprecated: use 'bar(_:)'
+  · variable 'x' was never used
+```
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | success |
 | `1` | a runtime error (no manifest — run `ws init`, recorded workspace gone, git failure, blocked `feature` / `local` preflight, unrecognized remote) |
-| `64` | usage error — bad flag, missing argument, no `Package.swift` at the given path (from ArgumentParser) |
+| `64` | usage error — bad flag, missing argument, no `Package.swift` at the given path, `jarvis` not on `PATH` (from ArgumentParser) |
+| other | `ws test` exits with `jarvis`'s own exit code (e.g. `65` when tests fail) |
 
 ## Development
 

@@ -15,8 +15,8 @@ not.
 
 ## Commands today
 
-`init`, `status`, `pulls`, `feature`, `local`, `clean`, `prune`. `README.md`
-documents what each does.
+`init`, `status`, `pulls`, `feature`, `local`, `clean`, `prune`, `test`.
+`README.md` documents what each does.
 
 ## Working preferences (important)
 
@@ -45,7 +45,8 @@ Key types in `WorkspaceKit`:
 | `RepoScanner` | Direct children of the root containing a `.git` entry, sorted |
 | `BuildCleaner` | Recursive walk of a root for `.build` dirs (no exclusions, no symlink follow); size + delete for `ws clean` |
 | `BranchPruner` | Per repo for `ws prune`: delete local branches except current + default; soft (`-d`) keeps unmerged as `keptUnmerged`, force (`-D`) with `-f` |
-| `ProcessRunning` (protocol) / `ProcessRunner` | Run an external command → `CommandResult` |
+| `ProcessRunning` (protocol) / `ProcessRunner` | Run an external command → `CommandResult`. `ProcessRunner.runCombined` merges stdout+stderr into one pipe (for `jarvis test`'s xcodebuild-sized output) |
+| `TestOutputParser` / `TestReport` | Pure: scrape `jarvis test` console text → errors, deduped warnings, test totals, failing tests. Used by `ws test` |
 | `Git` | Per-repo git via `ProcessRunning`: reads (branch, dirty, upstream delta, default branch), actions (fetch, stash, checkout, create branch, ff-merge), predicates (local/remote branch exists, is-ancestor) |
 | `FeatureStarter` | Orchestrates `ws feature`: preflight every module, then execute (stash → checkout default → ff-merge → branch) |
 | `PackageEditor` | Pure line-based `Package.swift` rewrite for `ws local`: `.dependency(…)` → `.dependency(path:)`, `.product` `package:` → full repo name |
@@ -76,9 +77,9 @@ Key types in `WorkspaceKit`:
   `Workspace.load()` — it reads `$WS_CONFIG` or `~/.ws.json` and resolves the
   recorded `root`. `ws init` is the only command that takes the *current
   directory* as the workspace and writes the manifest. Repo-local commands
-  (`pulls`) inspect the current directory and ignore the manifest. `local` is
-  both — manifest for the module paths, plus repo-local git on the Package.swift's
-  own repo when `-b` is passed. `clean` reads only `root` from the manifest, then
+  (`pulls`, `test`) inspect the current directory and ignore the manifest.
+  `local` is both — manifest for the module paths, plus repo-local git on the
+  Package.swift's own repo when `-b` is passed. `clean` reads only `root` from the manifest, then
   walks the tree with no exclusions. State which kind a new command is.
 - There is no `WS_HOME`. The workspace root lives *in* the manifest (`root`),
   recorded from `ws init`'s cwd. The manifest file is never inside the workspace.
@@ -89,9 +90,17 @@ Key types in `WorkspaceKit`:
 
 ## Known limitations / deferred
 
-- `ProcessRunner` reads stdout then stderr sequentially. Fine for git's small
-  output; a command streaming megabytes to both pipes could deadlock. Real fix
-  (concurrent reads) is deferred.
+- `ProcessRunner.run` reads stdout then stderr sequentially. Fine for git's small
+  output; a command streaming megabytes to both pipes could deadlock. `runCombined`
+  (one merged pipe) is the workaround, used by `ws test`; the general
+  concurrent-read fix is still deferred.
+- `TestOutputParser` is regex line-scraping. jarvis pipes xcodebuild through
+  **xcbeautify**, so the primary shapes are xcbeautify's (`❌`/`⚠️` diagnostics,
+  `✔`/`✖ [Target] name … (N seconds)` test lines, ANSI colour stripped first);
+  raw-xcodebuild patterns remain as a fallback. Verified against
+  `example1.txt` / `example2.txt` (captured xcbeautify output). An `❌` line with
+  `file:line:col:` is treated as a build error, one with only `file:line:` as an
+  XCTest assertion.
 - `status` is sequential. Parallelizing across repos with `TaskGroup` is a
   planned step, not yet done.
 - `feature` / `local` preflight hard, but do not roll back a failure that happens

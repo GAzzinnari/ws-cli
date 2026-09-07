@@ -51,4 +51,30 @@ public struct ProcessRunner: ProcessRunning {
             exitCode: process.terminationStatus
         )
     }
+
+    /// Like `run`, but stdout and stderr are merged into one stream. Safe for
+    /// commands that pour a lot into both at once (one pipe, one drain, no
+    /// two-pipe deadlock). `stderr` in the result is always empty.
+    public func runCombined(_ executable: String, _ arguments: [String], in directory: URL?) throws -> CommandResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [executable] + arguments
+        if let directory {
+            process.currentDirectoryURL = directory
+        }
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        return CommandResult(
+            stdout: String(decoding: data, as: UTF8.self),
+            stderr: "",
+            exitCode: process.terminationStatus
+        )
+    }
 }
